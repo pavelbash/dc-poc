@@ -1,0 +1,545 @@
+routers:
+      vmx1:
+            ssh_port: 2271
+            fpc_port: 10001
+            interfaces:
+                  xe-0/0/0:
+                      port: 13000
+                      dst_vm: mx80-1
+                      dst_if: xe-0/0/0
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/1:
+                      port: 13001
+                      dst_vm: mx80-1
+                      dst_if: xe-0/0/1
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/2:
+                      port: 13002
+                      dst_vm: mx80-1
+                      dst_if: xe-0/0/2
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/3:
+                      port: 13003
+                      dst_vm: vmx3
+                      dst_if: xe-0/0/0
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/4:
+                      port:
+                      dst_vm: mgmt
+                      dst_if:
+                      src_ip:
+                      dst_ip:
+      vmx2:
+            ssh_port: 2272
+            fpc_port: 10002
+            interfaces:
+                  xe-0/0/0:
+                      port: 13004
+                      dst_vm: mx80-2
+                      dst_if: xe-0/0/0
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/1:
+                      port: 13005
+                      dst_vm: mx80-2
+                      dst_if: xe-0/0/1
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/2:
+                      port: 13006
+                      dst_vm: mx80-2
+                      dst_if: xe-0/0/2
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/3:
+                      port: 13007
+                      dst_vm: vmx3
+                      dst_if: xe-0/0/1
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/4:
+                      port:
+                      dst_vm: mgmt
+                      dst_if:
+                      src_ip:
+                      dst_ip:
+      vmx3:
+            ssh_port: 2273
+            fpc_port: 10003
+            interfaces:
+                  xe-0/0/0:
+                      port: 13003
+                      dst_vm: vmx1
+                      dst_if: xe-0/0/3
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/1:
+                      port: 13007
+                      dst_vm: vmx2
+                      dst_if: xe-0/0/0
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/2:
+                      port: 13008
+                      dst_vm: mx80-3
+                      dst_if: xe-0/0/0
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/3:
+                      port: 13009
+                      dst_vm: mx80-4
+                      dst_if: xe-0/0/0
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/4:
+                      port: 13010
+                      dst_vm: vmx4
+                      dst_if: xe-0/0/0
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/5:
+                      port:
+                      dst_vm: mgmt
+                      dst_if:
+                      src_ip:
+                      dst_ip:
+      vmx4:
+            ssh_port: 2274
+            fpc_port: 10004
+            interfaces:
+                  xe-0/0/0:
+                      port: 13010
+                      dst_vm: vmx3
+                      dst_if: xe-0/0/4
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/1:
+                      port: 13011
+                      dst_vm: vsrx
+                      dst_if: xe-0/0/0
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/2:
+                      port:
+                      dst_vm: mgmt
+                      dst_if:
+                      src_ip:
+                      dst_ip:
+      mx80-1:
+            ssh_port: 2275
+            fpc_port: 10005
+            interfaces:
+                  xe-0/0/0:
+                      port: 13000
+                      dst_vm: vmx1
+                      dst_if: xe-0/0/0
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/1:
+                      port: 13001
+                      dst_vm: vmx1
+                      dst_if: xe-0/0/1
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/2:
+                      port: 13002
+                      dst_vm: vmx1
+                      dst_if: xe-0/0/2
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/3:
+                      port: 13012
+                      dst_vm: qfx1
+                      dst_if: xe-0/0/1
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/4:
+                      port: 13013
+                      dst_vm: qfx2
+                      dst_if: xe-0/0/1
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/5:
+                      port: 13014
+                      dst_vm: qfx3
+                      dst_if: xe-0/0/1
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/6:
+                      port:
+                      dst_vm: mgmt
+                      dst_if:
+                      src_ip:
+                      dst_ip:
+      mx80-2:
+            ssh_port: 2276
+            fpc_port: 10006
+            interfaces:
+                  xe-0/0/0:
+                      port: 13004
+                      dst_vm: vmx2
+                      dst_if: xe-0/0/0
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/1:
+                      port: 13005
+                      dst_vm: vmx2
+                      dst_if: xe-0/0/1
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/2:
+                      port: 13006
+                      dst_vm: vmx2
+                      dst_if: xe-0/0/2
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/3:
+                      port: 13015
+                      dst_vm: qfx1
+                      dst_if: xe-0/0/2
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/4:
+                      port: 13016
+                      dst_vm: qfx2
+                      dst_if: xe-0/0/2
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/5:
+                      port: 13017
+                      dst_vm: qfx3
+                      dst_if: xe-0/0/2
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/6:
+                      port:
+                      dst_vm: mgmt
+                      dst_if:
+                      src_ip:
+                      dst_ip:
+      mx80-3:
+            ssh_port: 2277
+            fpc_port: 10007
+            interfaces:
+                  xe-0/0/0:
+                      port: 13008
+                      dst_vm: vmx3
+                      dst_if: xe-0/0/2
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/1:
+                      port: 13018
+                      dst_vm: mx80-4
+                      dst_if: xe-0/0/1
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/2:
+                      port: 13019
+                      dst_vm: mx80-4
+                      dst_if: xe-0/0/2
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/3:
+                      port: 13020
+                      dst_vm: mx80-4
+                      dst_if: xe-0/0/3
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/4:
+                      port: 13021
+                      dst_vm: qfx4
+                      dst_if: xe-0/0/1
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/5:
+                      port: 13022
+                      dst_vm: qfx4
+                      dst_if: xe-0/0/2
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/6:
+                      port:
+                      dst_vm: mgmt
+                      dst_if:
+                      src_ip:
+                      dst_ip:
+      mx80-4:
+            ssh_port: 2278
+            fpc_port: 10008
+            interfaces:
+                  xe-0/0/0:
+                      port: 13009
+                      dst_vm: vmx3
+                      dst_if: xe-0/0/3
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/1:
+                      port: 13018
+                      dst_vm: mx80-3
+                      dst_if: xe-0/0/1
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/2:
+                      port: 13019
+                      dst_vm: mx80-3
+                      dst_if: xe-0/0/2
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/3:
+                      port: 13020
+                      dst_vm: mx80-3
+                      dst_if: xe-0/0/3
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/4:
+                      port: 13023
+                      dst_vm: qfx4
+                      dst_if: xe-0/0/3
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/5:
+                      port: 13024
+                      dst_vm: qfx4
+                      dst_if: xe-0/0/4
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/6:
+                      port:
+                      dst_vm: mgmt
+                      dst_if:
+                      src_ip:
+                      dst_ip:
+      vmx5:
+            ssh_port: 2279
+            fpc_port: 10009
+            interfaces:
+                  xe-0/0/0:
+                      port: 13025
+                      dst_vm: qfx1
+                      dst_if: xe-0/0/3
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/1:
+                      port: 13026
+                      dst_vm: qfx2
+                      dst_if: xe-0/0/3
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/2:
+                      port: 13027
+                      dst_vm: qfx2
+                      dst_if: xe-0/0/4
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/3:
+                      port: 13028
+                      dst_vm: qfx3
+                      dst_if: xe-0/0/3
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/4:
+                      port: 13029
+                      dst_vm: qfx4
+                      dst_if: xe-0/0/5
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/5:
+                      port: 13030
+                      dst_vm: qfx4
+                      dst_if: xe-0/0/6
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/6:
+                      port: 13031
+                      dst_vm: vsrx
+                      dst_if: xe-0/0/1
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/7:
+                      port:
+                      dst_vm: mgmt
+                      dst_if:
+                      src_ip:
+                      dst_ip:
+switches:
+      qfx1:
+            ssh_port: 2280
+            fpc_port: 10010
+            interfaces:
+                  xe-0/0/0:
+                      port:
+                      dst_vm:
+                      dst_if:
+                      src_ip:
+                      dst_ip:
+                  xe-0/0/1:
+                      port: 13012
+                      dst_vm: mx80-1
+                      dst_if: xe-0/0/3
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/2:
+                      port: 13015
+                      dst_vm: mx80-2
+                      dst_if: xe-0/0/3
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/3:
+                      port: 13025
+                      dst_vm: vmx5
+                      dst_if: xe-0/0/0
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/4:
+                      port:
+                      dst_vm: mgmt
+                      dst_if:
+                      src_ip:
+                      dst_ip:
+      qfx2:
+            ssh_port: 2281
+            fpc_port: 10011
+            interfaces:
+                  xe-0/0/0:
+                      port:
+                      dst_vm:
+                      dst_if:
+                      src_ip:
+                      dst_ip:
+                  xe-0/0/1:
+                      port: 13013
+                      dst_vm: mx80-1
+                      dst_if: xe-0/0/4
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/2:
+                      port: 13016
+                      dst_vm: mx80-2
+                      dst_if: xe-0/0/4
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/3:
+                      port: 13026
+                      dst_vm: vmx5
+                      dst_if: xe-0/0/1
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/4:
+                      port: 13027
+                      dst_vm: vmx5
+                      dst_if: xe-0/0/2
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/5:
+                      port:
+                      dst_vm: mgmt
+                      dst_if:
+                      src_ip:
+                      dst_ip:
+      qfx3:
+            ssh_port: 2282
+            fpc_port: 10012
+            interfaces:
+                  xe-0/0/0:
+                      port:
+                      dst_vm:
+                      dst_if:
+                      src_ip:
+                      dst_ip:
+                  xe-0/0/1:
+                      port: 13014
+                      dst_vm: mx80-1
+                      dst_if: xe-0/0/5
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/2:
+                      port: 13017
+                      dst_vm: mx80-2
+                      dst_if: xe-0/0/5
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/3:
+                      port: 13028
+                      dst_vm: vmx5
+                      dst_if: xe-0/0/3
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/4:
+                      port:
+                      dst_vm: mgmt
+                      dst_if:
+                      src_ip:
+                      dst_ip:
+      qfx4:
+            ssh_port: 2283
+            fpc_port: 10013
+            interfaces:
+                  xe-0/0/0:
+                      port:
+                      dst_vm:
+                      dst_if:
+                      src_ip:
+                      dst_ip:
+                  xe-0/0/1:
+                      port: 13021
+                      dst_vm: mx80-3
+                      dst_if: xe-0/0/4
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/2:
+                      port: 13022
+                      dst_vm: mx80-3
+                      dst_if: xe-0/0/5
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/3:
+                      port: 13023
+                      dst_vm: mx80-4
+                      dst_if: xe-0/0/4
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/4:
+                      port: 13024
+                      dst_vm: mx80-4
+                      dst_if: xe-0/0/5
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/5:
+                      port: 13029
+                      dst_vm: vmx5
+                      dst_if: xe-0/0/4
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/6:
+                      port: 13030
+                      dst_vm: vmx5
+                      dst_if: xe-0/0/5
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2
+                  xe-0/0/7:
+                      port:
+                      dst_vm: mgmt
+                      dst_if:
+                      src_ip:
+                      dst_ip:
+firewalls:
+      vsrx1:
+            ssh_port: 2284
+            fpc_port: 10014
+            interfaces:
+                  xe-0/0/0:
+                      port: 13011
+                      dst_vm: vmx4
+                      dst_if: xe-0/0/1
+                      src_ip: 127.255.255.2
+                      dst_ip: 127.255.255.1
+                  xe-0/0/1:
+                      port: 13031
+                      dst_vm: vmx5
+                      dst_if: xe-0/0/6
+                      src_ip: 127.255.255.1
+                      dst_ip: 127.255.255.2

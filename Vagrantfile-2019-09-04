@@ -1,0 +1,1909 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+def get_mac(oui="28:b7:ad")
+  "Generate a MAC address"
+  nic = (1..3).map{"%0.2x"%rand(256)}.join(":")
+  return "#{oui}:#{nic}"
+end
+
+cwd = Dir.pwd.split("/").last
+username = ENV['USER']
+domain_prefix = "#{username}_#{cwd}"
+
+Vagrant.configure("2") do |config|
+  config.vm.define "vmx1-vcp" do |node|
+    guest_name = "vmx1-vcp"
+    node.vm.box = "juniper/vmx-vcp"
+    node.vm.box_version = "17.3R2.10"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+    node.vm.network :forwarded_port, guest: 22, host: 2271, host_ip: "127.0.0.1"
+    node.ssh.insert_key = false
+
+    node.vm.provider :libvirt do |domain|
+      domain.default_prefix = "#{domain_prefix}"
+      domain.cpus = 1
+      domain.memory = 1024
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 11
+      domain.storage :file, :path => "#{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2", :size => "196870144", :type => "qcow2", :bus => "ide", :device => "hdb", :allow_existing => true
+      domain.storage :file, :path => "#{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img", :size => "16777216", :type => "raw", :bus => "ide", :device => "hdc", :allow_existing => true
+    end
+    add_volumes = [
+      "virsh vol-create-as default #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 196870144",
+      "sleep 1",
+      "virsh vol-upload --pool default #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 /opt/vagrant/storage/vmx-vcp-hdb-17.3R2.10-base.qcow2",
+      "sleep 1",
+      "virsh vol-create-as default #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img 16777216",
+      "sleep 1",
+      "virsh vol-upload --pool default #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img /opt/vagrant/storage/vmx-vcp-hdc-17.3R2.10-base.img",
+      "sleep 1"
+    ]
+    add_volumes.each do |i|
+      node.trigger.before :up do |trigger|
+        trigger.name = "add-volumes"
+        trigger.info = "Adding Volumes"
+        trigger.run = {inline: i}
+      end
+    end
+
+    delete_volumes = [
+      "virsh vol-delete #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 default",
+      "virsh vol-delete #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img default"
+    ]
+    delete_volumes.each do |i|
+      node.trigger.after :destroy do |trigger|
+        trigger.name = "remove-volumes"
+        trigger.info = "Removing Volumes"
+        trigger.run = {inline: i}
+      end
+    end
+
+    node.vm.network :private_network,
+      # vmx1 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 10001,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 10001,
+      :libvirt__iface_name => "internal-vmx1",
+      auto_config: false
+
+  end
+  config.vm.define "vmx1-vfp" do |node|
+    guest_name = "vmx1-vfp"
+    node.vm.box = "juniper/vmx-vfp"
+    node.vm.box_version = "17.3R2.10"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+
+    node.ssh.insert_key = false
+    node.ssh.username = "root"
+
+    node.vm.provider :libvirt do |domain|
+      domain.default_prefix = "#{domain_prefix}"
+      domain.cpus = 3
+      domain.memory = 4096
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 11
+    end
+
+    node.vm.network :private_network,
+      # vmx1 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 10001,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 10001,
+      :libvirt__iface_name => "internal-vmx1",
+      auto_config: false
+    node.vm.network :private_network,
+      # vmx1 xe-0/0/0 to mx80-1 xe-0/0/0
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13000,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13000,
+      :libvirt__iface_name => "vmx1-xe-0/0/0-to-mx80-1-xe-0/0/0",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # vmx1 xe-0/0/1 to mx80-1 xe-0/0/1
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13001,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13001,
+      :libvirt__iface_name => "vmx1-xe-0/0/1-to-mx80-1-xe-0/0/1",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # vmx1 xe-0/0/2 to mx80-1 xe-0/0/2
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13002,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13002,
+      :libvirt__iface_name => "vmx1-xe-0/0/2-to-mx80-1-xe-0/0/2",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # vmx1 xe-0/0/3 to vmx3 xe-0/0/0
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13003,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13003,
+      :libvirt__iface_name => "vmx1-xe-0/0/3-to-vmx3-xe-0/0/0",
+      auto_config: false
+
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+    :libvirt__network_name => 'mgmt'
+
+
+    end
+  config.vm.define "vmx2-vcp" do |node|
+    guest_name = "vmx2-vcp"
+    node.vm.box = "juniper/vmx-vcp"
+    node.vm.box_version = "17.3R2.10"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+    node.vm.network :forwarded_port, guest: 22, host: 2272, host_ip: "127.0.0.1"
+    node.ssh.insert_key = false
+
+    node.vm.provider :libvirt do |domain|
+      domain.default_prefix = "#{domain_prefix}"
+      domain.cpus = 1
+      domain.memory = 1024
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 11
+      domain.storage :file, :path => "#{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2", :size => "196870144", :type => "qcow2", :bus => "ide", :device => "hdb", :allow_existing => true
+      domain.storage :file, :path => "#{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img", :size => "16777216", :type => "raw", :bus => "ide", :device => "hdc", :allow_existing => true
+    end
+    add_volumes = [
+      "virsh vol-create-as default #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 196870144",
+      "sleep 1",
+      "virsh vol-upload --pool default #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 /opt/vagrant/storage/vmx-vcp-hdb-17.3R2.10-base.qcow2",
+      "sleep 1",
+      "virsh vol-create-as default #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img 16777216",
+      "sleep 1",
+      "virsh vol-upload --pool default #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img /opt/vagrant/storage/vmx-vcp-hdc-17.3R2.10-base.img",
+      "sleep 1"
+    ]
+    add_volumes.each do |i|
+      node.trigger.before :up do |trigger|
+        trigger.name = "add-volumes"
+        trigger.info = "Adding Volumes"
+        trigger.run = {inline: i}
+      end
+    end
+
+    delete_volumes = [
+      "virsh vol-delete #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 default",
+      "virsh vol-delete #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img default"
+    ]
+    delete_volumes.each do |i|
+      node.trigger.after :destroy do |trigger|
+        trigger.name = "remove-volumes"
+        trigger.info = "Removing Volumes"
+        trigger.run = {inline: i}
+      end
+    end
+
+    node.vm.network :private_network,
+      # vmx2 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 10002,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 10002,
+      :libvirt__iface_name => "internal-vmx2",
+      auto_config: false
+
+  end
+  config.vm.define "vmx2-vfp" do |node|
+    guest_name = "vmx2-vfp"
+    node.vm.box = "juniper/vmx-vfp"
+    node.vm.box_version = "17.3R2.10"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+
+    node.ssh.insert_key = false
+    node.ssh.username = "root"
+
+    node.vm.provider :libvirt do |domain|
+      domain.default_prefix = "#{domain_prefix}"
+      domain.cpus = 3
+      domain.memory = 4096
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 11
+    end
+
+    node.vm.network :private_network,
+      # vmx2 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 10002,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 10002,
+      :libvirt__iface_name => "internal-vmx2",
+      auto_config: false
+    node.vm.network :private_network,
+      # vmx2 xe-0/0/0 to mx80-2 xe-0/0/0
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13004,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13004,
+      :libvirt__iface_name => "vmx2-xe-0/0/0-to-mx80-2-xe-0/0/0",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # vmx2 xe-0/0/1 to mx80-2 xe-0/0/1
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13005,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13005,
+      :libvirt__iface_name => "vmx2-xe-0/0/1-to-mx80-2-xe-0/0/1",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # vmx2 xe-0/0/2 to mx80-2 xe-0/0/2
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13006,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13006,
+      :libvirt__iface_name => "vmx2-xe-0/0/2-to-mx80-2-xe-0/0/2",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # vmx2 xe-0/0/3 to vmx3 xe-0/0/1
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13007,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13007,
+      :libvirt__iface_name => "vmx2-xe-0/0/3-to-vmx3-xe-0/0/1",
+      auto_config: false
+
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+    :libvirt__network_name => 'mgmt'
+
+
+    end
+  config.vm.define "vmx3-vcp" do |node|
+    guest_name = "vmx3-vcp"
+    node.vm.box = "juniper/vmx-vcp"
+    node.vm.box_version = "17.3R2.10"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+    node.vm.network :forwarded_port, guest: 22, host: 2273, host_ip: "127.0.0.1"
+    node.ssh.insert_key = false
+
+    node.vm.provider :libvirt do |domain|
+      domain.default_prefix = "#{domain_prefix}"
+      domain.cpus = 1
+      domain.memory = 1024
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 11
+      domain.storage :file, :path => "#{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2", :size => "196870144", :type => "qcow2", :bus => "ide", :device => "hdb", :allow_existing => true
+      domain.storage :file, :path => "#{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img", :size => "16777216", :type => "raw", :bus => "ide", :device => "hdc", :allow_existing => true
+    end
+    add_volumes = [
+      "virsh vol-create-as default #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 196870144",
+      "sleep 1",
+      "virsh vol-upload --pool default #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 /opt/vagrant/storage/vmx-vcp-hdb-17.3R2.10-base.qcow2",
+      "sleep 1",
+      "virsh vol-create-as default #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img 16777216",
+      "sleep 1",
+      "virsh vol-upload --pool default #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img /opt/vagrant/storage/vmx-vcp-hdc-17.3R2.10-base.img",
+      "sleep 1"
+    ]
+    add_volumes.each do |i|
+      node.trigger.before :up do |trigger|
+        trigger.name = "add-volumes"
+        trigger.info = "Adding Volumes"
+        trigger.run = {inline: i}
+      end
+    end
+
+    delete_volumes = [
+      "virsh vol-delete #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 default",
+      "virsh vol-delete #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img default"
+    ]
+    delete_volumes.each do |i|
+      node.trigger.after :destroy do |trigger|
+        trigger.name = "remove-volumes"
+        trigger.info = "Removing Volumes"
+        trigger.run = {inline: i}
+      end
+    end
+
+    node.vm.network :private_network,
+      # vmx3 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 10003,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 10003,
+      :libvirt__iface_name => "internal-vmx3",
+      auto_config: false
+
+  end
+  config.vm.define "vmx3-vfp" do |node|
+    guest_name = "vmx3-vfp"
+    node.vm.box = "juniper/vmx-vfp"
+    node.vm.box_version = "17.3R2.10"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+
+    node.ssh.insert_key = false
+    node.ssh.username = "root"
+
+    node.vm.provider :libvirt do |domain|
+      domain.default_prefix = "#{domain_prefix}"
+      domain.cpus = 3
+      domain.memory = 4096
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 11
+    end
+
+    node.vm.network :private_network,
+      # vmx3 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 10003,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 10003,
+      :libvirt__iface_name => "internal-vmx3",
+      auto_config: false
+    node.vm.network :private_network,
+      # vmx3 xe-0/0/0 to vmx1 xe-0/0/3
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13003,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13003,
+      :libvirt__iface_name => "vmx3-xe-0/0/0-to-vmx1-xe-0/0/3",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # vmx3 xe-0/0/1 to vmx2 xe-0/0/0
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13007,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13007,
+      :libvirt__iface_name => "vmx3-xe-0/0/1-to-vmx2-xe-0/0/0",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # vmx3 xe-0/0/2 to mx80-3 xe-0/0/0
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13008,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13008,
+      :libvirt__iface_name => "vmx3-xe-0/0/2-to-mx80-3-xe-0/0/0",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # vmx3 xe-0/0/3 to mx80-4 xe-0/0/0
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13009,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13009,
+      :libvirt__iface_name => "vmx3-xe-0/0/3-to-mx80-4-xe-0/0/0",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # vmx3 xe-0/0/4 to vmx4 xe-0/0/0
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13010,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13010,
+      :libvirt__iface_name => "vmx3-xe-0/0/4-to-vmx4-xe-0/0/0",
+      auto_config: false
+
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+    :libvirt__network_name => 'mgmt'
+
+
+    end
+  config.vm.define "vmx4-vcp" do |node|
+    guest_name = "vmx4-vcp"
+    node.vm.box = "juniper/vmx-vcp"
+    node.vm.box_version = "17.3R2.10"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+    node.vm.network :forwarded_port, guest: 22, host: 2274, host_ip: "127.0.0.1"
+    node.ssh.insert_key = false
+
+    node.vm.provider :libvirt do |domain|
+      domain.default_prefix = "#{domain_prefix}"
+      domain.cpus = 1
+      domain.memory = 1024
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 11
+      domain.storage :file, :path => "#{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2", :size => "196870144", :type => "qcow2", :bus => "ide", :device => "hdb", :allow_existing => true
+      domain.storage :file, :path => "#{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img", :size => "16777216", :type => "raw", :bus => "ide", :device => "hdc", :allow_existing => true
+    end
+    add_volumes = [
+      "virsh vol-create-as default #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 196870144",
+      "sleep 1",
+      "virsh vol-upload --pool default #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 /opt/vagrant/storage/vmx-vcp-hdb-17.3R2.10-base.qcow2",
+      "sleep 1",
+      "virsh vol-create-as default #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img 16777216",
+      "sleep 1",
+      "virsh vol-upload --pool default #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img /opt/vagrant/storage/vmx-vcp-hdc-17.3R2.10-base.img",
+      "sleep 1"
+    ]
+    add_volumes.each do |i|
+      node.trigger.before :up do |trigger|
+        trigger.name = "add-volumes"
+        trigger.info = "Adding Volumes"
+        trigger.run = {inline: i}
+      end
+    end
+
+    delete_volumes = [
+      "virsh vol-delete #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 default",
+      "virsh vol-delete #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img default"
+    ]
+    delete_volumes.each do |i|
+      node.trigger.after :destroy do |trigger|
+        trigger.name = "remove-volumes"
+        trigger.info = "Removing Volumes"
+        trigger.run = {inline: i}
+      end
+    end
+
+    node.vm.network :private_network,
+      # vmx4 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 10004,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 10004,
+      :libvirt__iface_name => "internal-vmx4",
+      auto_config: false
+
+  end
+  config.vm.define "vmx4-vfp" do |node|
+    guest_name = "vmx4-vfp"
+    node.vm.box = "juniper/vmx-vfp"
+    node.vm.box_version = "17.3R2.10"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+
+    node.ssh.insert_key = false
+    node.ssh.username = "root"
+
+    node.vm.provider :libvirt do |domain|
+      domain.default_prefix = "#{domain_prefix}"
+      domain.cpus = 3
+      domain.memory = 4096
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 11
+    end
+
+    node.vm.network :private_network,
+      # vmx4 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 10004,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 10004,
+      :libvirt__iface_name => "internal-vmx4",
+      auto_config: false
+    node.vm.network :private_network,
+      # vmx4 xe-0/0/0 to vmx3 xe-0/0/4
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13010,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13010,
+      :libvirt__iface_name => "vmx4-xe-0/0/0-to-vmx3-xe-0/0/4",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # vmx4 xe-0/0/1 to vsrx xe-0/0/0
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13011,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13011,
+      :libvirt__iface_name => "vmx4-xe-0/0/1-to-vsrx-xe-0/0/0",
+      auto_config: false
+
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+    :libvirt__network_name => 'mgmt'
+
+
+    end
+  config.vm.define "mx80-1-vcp" do |node|
+    guest_name = "mx80-1-vcp"
+    node.vm.box = "juniper/vmx-vcp"
+    node.vm.box_version = "17.3R2.10"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+    node.vm.network :forwarded_port, guest: 22, host: 2275, host_ip: "127.0.0.1"
+    node.ssh.insert_key = false
+
+    node.vm.provider :libvirt do |domain|
+      domain.default_prefix = "#{domain_prefix}"
+      domain.cpus = 1
+      domain.memory = 1024
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 11
+      domain.storage :file, :path => "#{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2", :size => "196870144", :type => "qcow2", :bus => "ide", :device => "hdb", :allow_existing => true
+      domain.storage :file, :path => "#{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img", :size => "16777216", :type => "raw", :bus => "ide", :device => "hdc", :allow_existing => true
+    end
+    add_volumes = [
+      "virsh vol-create-as default #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 196870144",
+      "sleep 1",
+      "virsh vol-upload --pool default #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 /opt/vagrant/storage/vmx-vcp-hdb-17.3R2.10-base.qcow2",
+      "sleep 1",
+      "virsh vol-create-as default #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img 16777216",
+      "sleep 1",
+      "virsh vol-upload --pool default #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img /opt/vagrant/storage/vmx-vcp-hdc-17.3R2.10-base.img",
+      "sleep 1"
+    ]
+    add_volumes.each do |i|
+      node.trigger.before :up do |trigger|
+        trigger.name = "add-volumes"
+        trigger.info = "Adding Volumes"
+        trigger.run = {inline: i}
+      end
+    end
+
+    delete_volumes = [
+      "virsh vol-delete #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 default",
+      "virsh vol-delete #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img default"
+    ]
+    delete_volumes.each do |i|
+      node.trigger.after :destroy do |trigger|
+        trigger.name = "remove-volumes"
+        trigger.info = "Removing Volumes"
+        trigger.run = {inline: i}
+      end
+    end
+
+    node.vm.network :private_network,
+      # mx80-1 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 10005,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 10005,
+      :libvirt__iface_name => "internal-mx80-1",
+      auto_config: false
+
+  end
+  config.vm.define "mx80-1-vfp" do |node|
+    guest_name = "mx80-1-vfp"
+    node.vm.box = "juniper/vmx-vfp"
+    node.vm.box_version = "17.3R2.10"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+
+    node.ssh.insert_key = false
+    node.ssh.username = "root"
+
+    node.vm.provider :libvirt do |domain|
+      domain.default_prefix = "#{domain_prefix}"
+      domain.cpus = 3
+      domain.memory = 4096
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 11
+    end
+
+    node.vm.network :private_network,
+      # mx80-1 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 10005,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 10005,
+      :libvirt__iface_name => "internal-mx80-1",
+      auto_config: false
+    node.vm.network :private_network,
+      # mx80-1 xe-0/0/0 to vmx1 xe-0/0/0
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13000,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13000,
+      :libvirt__iface_name => "mx80-1-xe-0/0/0-to-vmx1-xe-0/0/0",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # mx80-1 xe-0/0/1 to vmx1 xe-0/0/1
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13001,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13001,
+      :libvirt__iface_name => "mx80-1-xe-0/0/1-to-vmx1-xe-0/0/1",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # mx80-1 xe-0/0/2 to vmx1 xe-0/0/2
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13002,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13002,
+      :libvirt__iface_name => "mx80-1-xe-0/0/2-to-vmx1-xe-0/0/2",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # mx80-1 xe-0/0/3 to qfx1 xe-0/0/1
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13012,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13012,
+      :libvirt__iface_name => "mx80-1-xe-0/0/3-to-qfx1-xe-0/0/1",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # mx80-1 xe-0/0/4 to qfx2 xe-0/0/1
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13013,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13013,
+      :libvirt__iface_name => "mx80-1-xe-0/0/4-to-qfx2-xe-0/0/1",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # mx80-1 xe-0/0/5 to qfx3 xe-0/0/1
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13014,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13014,
+      :libvirt__iface_name => "mx80-1-xe-0/0/5-to-qfx3-xe-0/0/1",
+      auto_config: false
+
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+    :libvirt__network_name => 'mgmt'
+
+
+    end
+  config.vm.define "mx80-2-vcp" do |node|
+    guest_name = "mx80-2-vcp"
+    node.vm.box = "juniper/vmx-vcp"
+    node.vm.box_version = "17.3R2.10"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+    node.vm.network :forwarded_port, guest: 22, host: 2276, host_ip: "127.0.0.1"
+    node.ssh.insert_key = false
+
+    node.vm.provider :libvirt do |domain|
+      domain.default_prefix = "#{domain_prefix}"
+      domain.cpus = 1
+      domain.memory = 1024
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 11
+      domain.storage :file, :path => "#{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2", :size => "196870144", :type => "qcow2", :bus => "ide", :device => "hdb", :allow_existing => true
+      domain.storage :file, :path => "#{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img", :size => "16777216", :type => "raw", :bus => "ide", :device => "hdc", :allow_existing => true
+    end
+    add_volumes = [
+      "virsh vol-create-as default #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 196870144",
+      "sleep 1",
+      "virsh vol-upload --pool default #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 /opt/vagrant/storage/vmx-vcp-hdb-17.3R2.10-base.qcow2",
+      "sleep 1",
+      "virsh vol-create-as default #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img 16777216",
+      "sleep 1",
+      "virsh vol-upload --pool default #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img /opt/vagrant/storage/vmx-vcp-hdc-17.3R2.10-base.img",
+      "sleep 1"
+    ]
+    add_volumes.each do |i|
+      node.trigger.before :up do |trigger|
+        trigger.name = "add-volumes"
+        trigger.info = "Adding Volumes"
+        trigger.run = {inline: i}
+      end
+    end
+
+    delete_volumes = [
+      "virsh vol-delete #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 default",
+      "virsh vol-delete #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img default"
+    ]
+    delete_volumes.each do |i|
+      node.trigger.after :destroy do |trigger|
+        trigger.name = "remove-volumes"
+        trigger.info = "Removing Volumes"
+        trigger.run = {inline: i}
+      end
+    end
+
+    node.vm.network :private_network,
+      # mx80-2 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 10006,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 10006,
+      :libvirt__iface_name => "internal-mx80-2",
+      auto_config: false
+
+  end
+  config.vm.define "mx80-2-vfp" do |node|
+    guest_name = "mx80-2-vfp"
+    node.vm.box = "juniper/vmx-vfp"
+    node.vm.box_version = "17.3R2.10"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+
+    node.ssh.insert_key = false
+    node.ssh.username = "root"
+
+    node.vm.provider :libvirt do |domain|
+      domain.default_prefix = "#{domain_prefix}"
+      domain.cpus = 3
+      domain.memory = 4096
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 11
+    end
+
+    node.vm.network :private_network,
+      # mx80-2 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 10006,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 10006,
+      :libvirt__iface_name => "internal-mx80-2",
+      auto_config: false
+    node.vm.network :private_network,
+      # mx80-2 xe-0/0/0 to vmx2 xe-0/0/0
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13004,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13004,
+      :libvirt__iface_name => "mx80-2-xe-0/0/0-to-vmx2-xe-0/0/0",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # mx80-2 xe-0/0/1 to vmx2 xe-0/0/1
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13005,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13005,
+      :libvirt__iface_name => "mx80-2-xe-0/0/1-to-vmx2-xe-0/0/1",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # mx80-2 xe-0/0/2 to vmx2 xe-0/0/2
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13006,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13006,
+      :libvirt__iface_name => "mx80-2-xe-0/0/2-to-vmx2-xe-0/0/2",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # mx80-2 xe-0/0/3 to qfx1 xe-0/0/2
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13015,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13015,
+      :libvirt__iface_name => "mx80-2-xe-0/0/3-to-qfx1-xe-0/0/2",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # mx80-2 xe-0/0/4 to qfx2 xe-0/0/2
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13016,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13016,
+      :libvirt__iface_name => "mx80-2-xe-0/0/4-to-qfx2-xe-0/0/2",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # mx80-2 xe-0/0/5 to qfx3 xe-0/0/2
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13017,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13017,
+      :libvirt__iface_name => "mx80-2-xe-0/0/5-to-qfx3-xe-0/0/2",
+      auto_config: false
+
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+    :libvirt__network_name => 'mgmt'
+
+
+    end
+  config.vm.define "mx80-3-vcp" do |node|
+    guest_name = "mx80-3-vcp"
+    node.vm.box = "juniper/vmx-vcp"
+    node.vm.box_version = "17.3R2.10"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+    node.vm.network :forwarded_port, guest: 22, host: 2277, host_ip: "127.0.0.1"
+    node.ssh.insert_key = false
+
+    node.vm.provider :libvirt do |domain|
+      domain.default_prefix = "#{domain_prefix}"
+      domain.cpus = 1
+      domain.memory = 1024
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 11
+      domain.storage :file, :path => "#{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2", :size => "196870144", :type => "qcow2", :bus => "ide", :device => "hdb", :allow_existing => true
+      domain.storage :file, :path => "#{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img", :size => "16777216", :type => "raw", :bus => "ide", :device => "hdc", :allow_existing => true
+    end
+    add_volumes = [
+      "virsh vol-create-as default #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 196870144",
+      "sleep 1",
+      "virsh vol-upload --pool default #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 /opt/vagrant/storage/vmx-vcp-hdb-17.3R2.10-base.qcow2",
+      "sleep 1",
+      "virsh vol-create-as default #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img 16777216",
+      "sleep 1",
+      "virsh vol-upload --pool default #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img /opt/vagrant/storage/vmx-vcp-hdc-17.3R2.10-base.img",
+      "sleep 1"
+    ]
+    add_volumes.each do |i|
+      node.trigger.before :up do |trigger|
+        trigger.name = "add-volumes"
+        trigger.info = "Adding Volumes"
+        trigger.run = {inline: i}
+      end
+    end
+
+    delete_volumes = [
+      "virsh vol-delete #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 default",
+      "virsh vol-delete #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img default"
+    ]
+    delete_volumes.each do |i|
+      node.trigger.after :destroy do |trigger|
+        trigger.name = "remove-volumes"
+        trigger.info = "Removing Volumes"
+        trigger.run = {inline: i}
+      end
+    end
+
+    node.vm.network :private_network,
+      # mx80-3 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 10007,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 10007,
+      :libvirt__iface_name => "internal-mx80-3",
+      auto_config: false
+
+  end
+  config.vm.define "mx80-3-vfp" do |node|
+    guest_name = "mx80-3-vfp"
+    node.vm.box = "juniper/vmx-vfp"
+    node.vm.box_version = "17.3R2.10"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+
+    node.ssh.insert_key = false
+    node.ssh.username = "root"
+
+    node.vm.provider :libvirt do |domain|
+      domain.default_prefix = "#{domain_prefix}"
+      domain.cpus = 3
+      domain.memory = 4096
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 11
+    end
+
+    node.vm.network :private_network,
+      # mx80-3 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 10007,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 10007,
+      :libvirt__iface_name => "internal-mx80-3",
+      auto_config: false
+    node.vm.network :private_network,
+      # mx80-3 xe-0/0/0 to vmx3 xe-0/0/2
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13008,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13008,
+      :libvirt__iface_name => "mx80-3-xe-0/0/0-to-vmx3-xe-0/0/2",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # mx80-3 xe-0/0/1 to mx80-4 xe-0/0/1
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13018,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13018,
+      :libvirt__iface_name => "mx80-3-xe-0/0/1-to-mx80-4-xe-0/0/1",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # mx80-3 xe-0/0/2 to mx80-4 xe-0/0/2
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13019,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13019,
+      :libvirt__iface_name => "mx80-3-xe-0/0/2-to-mx80-4-xe-0/0/2",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # mx80-3 xe-0/0/3 to mx80-4 xe-0/0/3
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13020,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13020,
+      :libvirt__iface_name => "mx80-3-xe-0/0/3-to-mx80-4-xe-0/0/3",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # mx80-3 xe-0/0/4 to qfx4 xe-0/0/1
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13021,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13021,
+      :libvirt__iface_name => "mx80-3-xe-0/0/4-to-qfx4-xe-0/0/1",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # mx80-3 xe-0/0/5 to qfx4 xe-0/0/2
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13022,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13022,
+      :libvirt__iface_name => "mx80-3-xe-0/0/5-to-qfx4-xe-0/0/2",
+      auto_config: false
+
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+    :libvirt__network_name => 'mgmt'
+
+
+    end
+  config.vm.define "mx80-4-vcp" do |node|
+    guest_name = "mx80-4-vcp"
+    node.vm.box = "juniper/vmx-vcp"
+    node.vm.box_version = "17.3R2.10"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+    node.vm.network :forwarded_port, guest: 22, host: 2278, host_ip: "127.0.0.1"
+    node.ssh.insert_key = false
+
+    node.vm.provider :libvirt do |domain|
+      domain.default_prefix = "#{domain_prefix}"
+      domain.cpus = 1
+      domain.memory = 1024
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 11
+      domain.storage :file, :path => "#{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2", :size => "196870144", :type => "qcow2", :bus => "ide", :device => "hdb", :allow_existing => true
+      domain.storage :file, :path => "#{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img", :size => "16777216", :type => "raw", :bus => "ide", :device => "hdc", :allow_existing => true
+    end
+    add_volumes = [
+      "virsh vol-create-as default #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 196870144",
+      "sleep 1",
+      "virsh vol-upload --pool default #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 /opt/vagrant/storage/vmx-vcp-hdb-17.3R2.10-base.qcow2",
+      "sleep 1",
+      "virsh vol-create-as default #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img 16777216",
+      "sleep 1",
+      "virsh vol-upload --pool default #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img /opt/vagrant/storage/vmx-vcp-hdc-17.3R2.10-base.img",
+      "sleep 1"
+    ]
+    add_volumes.each do |i|
+      node.trigger.before :up do |trigger|
+        trigger.name = "add-volumes"
+        trigger.info = "Adding Volumes"
+        trigger.run = {inline: i}
+      end
+    end
+
+    delete_volumes = [
+      "virsh vol-delete #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 default",
+      "virsh vol-delete #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img default"
+    ]
+    delete_volumes.each do |i|
+      node.trigger.after :destroy do |trigger|
+        trigger.name = "remove-volumes"
+        trigger.info = "Removing Volumes"
+        trigger.run = {inline: i}
+      end
+    end
+
+    node.vm.network :private_network,
+      # mx80-4 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 10008,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 10008,
+      :libvirt__iface_name => "internal-mx80-4",
+      auto_config: false
+
+  end
+  config.vm.define "mx80-4-vfp" do |node|
+    guest_name = "mx80-4-vfp"
+    node.vm.box = "juniper/vmx-vfp"
+    node.vm.box_version = "17.3R2.10"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+
+    node.ssh.insert_key = false
+    node.ssh.username = "root"
+
+    node.vm.provider :libvirt do |domain|
+      domain.default_prefix = "#{domain_prefix}"
+      domain.cpus = 3
+      domain.memory = 4096
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 11
+    end
+
+    node.vm.network :private_network,
+      # mx80-4 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 10008,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 10008,
+      :libvirt__iface_name => "internal-mx80-4",
+      auto_config: false
+    node.vm.network :private_network,
+      # mx80-4 xe-0/0/0 to vmx3 xe-0/0/3
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13009,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13009,
+      :libvirt__iface_name => "mx80-4-xe-0/0/0-to-vmx3-xe-0/0/3",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # mx80-4 xe-0/0/1 to mx80-3 xe-0/0/1
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13018,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13018,
+      :libvirt__iface_name => "mx80-4-xe-0/0/1-to-mx80-3-xe-0/0/1",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # mx80-4 xe-0/0/2 to mx80-3 xe-0/0/2
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13019,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13019,
+      :libvirt__iface_name => "mx80-4-xe-0/0/2-to-mx80-3-xe-0/0/2",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # mx80-4 xe-0/0/3 to mx80-3 xe-0/0/3
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13020,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13020,
+      :libvirt__iface_name => "mx80-4-xe-0/0/3-to-mx80-3-xe-0/0/3",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # mx80-4 xe-0/0/4 to qfx4 xe-0/0/3
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13023,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13023,
+      :libvirt__iface_name => "mx80-4-xe-0/0/4-to-qfx4-xe-0/0/3",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # mx80-4 xe-0/0/5 to qfx4 xe-0/0/4
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13024,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13024,
+      :libvirt__iface_name => "mx80-4-xe-0/0/5-to-qfx4-xe-0/0/4",
+      auto_config: false
+
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+    :libvirt__network_name => 'mgmt'
+
+
+    end
+  config.vm.define "vmx5-vcp" do |node|
+    guest_name = "vmx5-vcp"
+    node.vm.box = "juniper/vmx-vcp"
+    node.vm.box_version = "17.3R2.10"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+    node.vm.network :forwarded_port, guest: 22, host: 2279, host_ip: "127.0.0.1"
+    node.ssh.insert_key = false
+
+    node.vm.provider :libvirt do |domain|
+      domain.default_prefix = "#{domain_prefix}"
+      domain.cpus = 1
+      domain.memory = 1024
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 11
+      domain.storage :file, :path => "#{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2", :size => "196870144", :type => "qcow2", :bus => "ide", :device => "hdb", :allow_existing => true
+      domain.storage :file, :path => "#{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img", :size => "16777216", :type => "raw", :bus => "ide", :device => "hdc", :allow_existing => true
+    end
+    add_volumes = [
+      "virsh vol-create-as default #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 196870144",
+      "sleep 1",
+      "virsh vol-upload --pool default #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 /opt/vagrant/storage/vmx-vcp-hdb-17.3R2.10-base.qcow2",
+      "sleep 1",
+      "virsh vol-create-as default #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img 16777216",
+      "sleep 1",
+      "virsh vol-upload --pool default #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img /opt/vagrant/storage/vmx-vcp-hdc-17.3R2.10-base.img",
+      "sleep 1"
+    ]
+    add_volumes.each do |i|
+      node.trigger.before :up do |trigger|
+        trigger.name = "add-volumes"
+        trigger.info = "Adding Volumes"
+        trigger.run = {inline: i}
+      end
+    end
+
+    delete_volumes = [
+      "virsh vol-delete #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 default",
+      "virsh vol-delete #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img default"
+    ]
+    delete_volumes.each do |i|
+      node.trigger.after :destroy do |trigger|
+        trigger.name = "remove-volumes"
+        trigger.info = "Removing Volumes"
+        trigger.run = {inline: i}
+      end
+    end
+
+    node.vm.network :private_network,
+      # vmx5 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 10009,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 10009,
+      :libvirt__iface_name => "internal-vmx5",
+      auto_config: false
+
+  end
+  config.vm.define "vmx5-vfp" do |node|
+    guest_name = "vmx5-vfp"
+    node.vm.box = "juniper/vmx-vfp"
+    node.vm.box_version = "17.3R2.10"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+
+    node.ssh.insert_key = false
+    node.ssh.username = "root"
+
+    node.vm.provider :libvirt do |domain|
+      domain.default_prefix = "#{domain_prefix}"
+      domain.cpus = 3
+      domain.memory = 4096
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 11
+    end
+
+    node.vm.network :private_network,
+      # vmx5 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 10009,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 10009,
+      :libvirt__iface_name => "internal-vmx5",
+      auto_config: false
+    node.vm.network :private_network,
+      # vmx5 xe-0/0/0 to qfx1 xe-0/0/3
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13025,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13025,
+      :libvirt__iface_name => "vmx5-xe-0/0/0-to-qfx1-xe-0/0/3",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # vmx5 xe-0/0/1 to qfx2 xe-0/0/3
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13026,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13026,
+      :libvirt__iface_name => "vmx5-xe-0/0/1-to-qfx2-xe-0/0/3",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # vmx5 xe-0/0/2 to qfx2 xe-0/0/4
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13027,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13027,
+      :libvirt__iface_name => "vmx5-xe-0/0/2-to-qfx2-xe-0/0/4",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # vmx5 xe-0/0/3 to qfx3 xe-0/0/3
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13028,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13028,
+      :libvirt__iface_name => "vmx5-xe-0/0/3-to-qfx3-xe-0/0/3",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # vmx5 xe-0/0/4 to qfx4 xe-0/0/5
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13029,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13029,
+      :libvirt__iface_name => "vmx5-xe-0/0/4-to-qfx4-xe-0/0/5",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # vmx5 xe-0/0/5 to qfx4 xe-0/0/6
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13030,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13030,
+      :libvirt__iface_name => "vmx5-xe-0/0/5-to-qfx4-xe-0/0/6",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # vmx5 xe-0/0/6 to vsrx xe-0/0/1
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13031,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13031,
+      :libvirt__iface_name => "vmx5-xe-0/0/6-to-vsrx-xe-0/0/1",
+      auto_config: false
+
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+    :libvirt__network_name => 'mgmt'
+
+
+    end
+  config.vm.define "qfx1-re" do |node|
+    guest_name = "qfx1-re"
+    node.vm.box = "juniper/vqfx-re"
+    node.vm.box_version = "17.3R3-S2.2"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+    node.vm.network :forwarded_port, guest: 22, host: 2280, host_ip: "127.0.0.1"
+    node.ssh.insert_key = false
+
+    node.vm.provider :libvirt do |domain|
+      domain.cpus = 1
+      domain.memory = 1024
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 10
+      domain.nic_model_type = "e1000"
+    end
+
+    node.vm.network :private_network,
+      # qfx1 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 10010,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 10010,
+      :libvirt__iface_name => "internal-qfx1",
+      auto_config: false
+
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+	:libvirt__network_name => 'reserved-bridge'
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+	:libvirt__network_name => 'reserved-bridge'
+
+
+    node.vm.network :private_network,
+      # qfx1 xe-0/0/1 to mx80-1 xe-0/0/3
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13012,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13012,
+      :libvirt__iface_name => "qfx1-xe-0/0/1-to-mx80-1-xe-0/0/3",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # qfx1 xe-0/0/2 to mx80-2 xe-0/0/3
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13015,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13015,
+      :libvirt__iface_name => "qfx1-xe-0/0/2-to-mx80-2-xe-0/0/3",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # qfx1 xe-0/0/3 to vmx5 xe-0/0/0
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13025,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13025,
+      :libvirt__iface_name => "qfx1-xe-0/0/3-to-vmx5-xe-0/0/0",
+      auto_config: false
+
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+    :libvirt__network_name => 'mgmt'
+
+
+  end
+
+  config.vm.define "qfx1-pfe" do |node|
+    guest_name = "qfx1pfe"
+    node.vm.box = "juniper/vqfx-pfe"
+    node.vm.box_version = "17.3R3-S2.2"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+    node.ssh.insert_key = false
+
+    node.vm.provider :libvirt do |domain|
+      domain.cpus = 1
+      domain.memory = 2048
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 8
+      domain.nic_model_type = "e1000"
+    end
+
+    node.vm.network :private_network,
+      # qfx1 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 10010,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 10010,
+      :libvirt__iface_name => "internal-qfx1",
+      auto_config: false
+  end
+  config.vm.define "qfx2-re" do |node|
+    guest_name = "qfx2-re"
+    node.vm.box = "juniper/vqfx-re"
+    node.vm.box_version = "17.3R3-S2.2"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+    node.vm.network :forwarded_port, guest: 22, host: 2281, host_ip: "127.0.0.1"
+    node.ssh.insert_key = false
+
+    node.vm.provider :libvirt do |domain|
+      domain.cpus = 1
+      domain.memory = 1024
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 10
+      domain.nic_model_type = "e1000"
+    end
+
+    node.vm.network :private_network,
+      # qfx2 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 10011,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 10011,
+      :libvirt__iface_name => "internal-qfx2",
+      auto_config: false
+
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+	:libvirt__network_name => 'reserved-bridge'
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+	:libvirt__network_name => 'reserved-bridge'
+
+
+    node.vm.network :private_network,
+      # qfx2 xe-0/0/1 to mx80-1 xe-0/0/4
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13013,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13013,
+      :libvirt__iface_name => "qfx2-xe-0/0/1-to-mx80-1-xe-0/0/4",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # qfx2 xe-0/0/2 to mx80-2 xe-0/0/4
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13016,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13016,
+      :libvirt__iface_name => "qfx2-xe-0/0/2-to-mx80-2-xe-0/0/4",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # qfx2 xe-0/0/3 to vmx5 xe-0/0/1
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13026,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13026,
+      :libvirt__iface_name => "qfx2-xe-0/0/3-to-vmx5-xe-0/0/1",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # qfx2 xe-0/0/4 to vmx5 xe-0/0/2
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13027,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13027,
+      :libvirt__iface_name => "qfx2-xe-0/0/4-to-vmx5-xe-0/0/2",
+      auto_config: false
+
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+    :libvirt__network_name => 'mgmt'
+
+
+  end
+
+  config.vm.define "qfx2-pfe" do |node|
+    guest_name = "qfx2pfe"
+    node.vm.box = "juniper/vqfx-pfe"
+    node.vm.box_version = "17.3R3-S2.2"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+    node.ssh.insert_key = false
+
+    node.vm.provider :libvirt do |domain|
+      domain.cpus = 1
+      domain.memory = 2048
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 8
+      domain.nic_model_type = "e1000"
+    end
+
+    node.vm.network :private_network,
+      # qfx2 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 10011,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 10011,
+      :libvirt__iface_name => "internal-qfx2",
+      auto_config: false
+  end
+  config.vm.define "qfx3-re" do |node|
+    guest_name = "qfx3-re"
+    node.vm.box = "juniper/vqfx-re"
+    node.vm.box_version = "17.3R3-S2.2"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+    node.vm.network :forwarded_port, guest: 22, host: 2282, host_ip: "127.0.0.1"
+    node.ssh.insert_key = false
+
+    node.vm.provider :libvirt do |domain|
+      domain.cpus = 1
+      domain.memory = 1024
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 10
+      domain.nic_model_type = "e1000"
+    end
+
+    node.vm.network :private_network,
+      # qfx3 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 10012,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 10012,
+      :libvirt__iface_name => "internal-qfx3",
+      auto_config: false
+
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+	:libvirt__network_name => 'reserved-bridge'
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+	:libvirt__network_name => 'reserved-bridge'
+
+
+    node.vm.network :private_network,
+      # qfx3 xe-0/0/1 to mx80-1 xe-0/0/5
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13014,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13014,
+      :libvirt__iface_name => "qfx3-xe-0/0/1-to-mx80-1-xe-0/0/5",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # qfx3 xe-0/0/2 to mx80-2 xe-0/0/5
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13017,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13017,
+      :libvirt__iface_name => "qfx3-xe-0/0/2-to-mx80-2-xe-0/0/5",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # qfx3 xe-0/0/3 to vmx5 xe-0/0/3
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13028,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13028,
+      :libvirt__iface_name => "qfx3-xe-0/0/3-to-vmx5-xe-0/0/3",
+      auto_config: false
+
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+    :libvirt__network_name => 'mgmt'
+
+
+  end
+
+  config.vm.define "qfx3-pfe" do |node|
+    guest_name = "qfx3pfe"
+    node.vm.box = "juniper/vqfx-pfe"
+    node.vm.box_version = "17.3R3-S2.2"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+    node.ssh.insert_key = false
+
+    node.vm.provider :libvirt do |domain|
+      domain.cpus = 1
+      domain.memory = 2048
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 8
+      domain.nic_model_type = "e1000"
+    end
+
+    node.vm.network :private_network,
+      # qfx3 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 10012,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 10012,
+      :libvirt__iface_name => "internal-qfx3",
+      auto_config: false
+  end
+  config.vm.define "qfx4-re" do |node|
+    guest_name = "qfx4-re"
+    node.vm.box = "juniper/vqfx-re"
+    node.vm.box_version = "17.3R3-S2.2"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+    node.vm.network :forwarded_port, guest: 22, host: 2283, host_ip: "127.0.0.1"
+    node.ssh.insert_key = false
+
+    node.vm.provider :libvirt do |domain|
+      domain.cpus = 1
+      domain.memory = 1024
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 10
+      domain.nic_model_type = "e1000"
+    end
+
+    node.vm.network :private_network,
+      # qfx4 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 10013,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 10013,
+      :libvirt__iface_name => "internal-qfx4",
+      auto_config: false
+
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+	:libvirt__network_name => 'reserved-bridge'
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+	:libvirt__network_name => 'reserved-bridge'
+
+
+    node.vm.network :private_network,
+      # qfx4 xe-0/0/1 to mx80-3 xe-0/0/4
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13021,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13021,
+      :libvirt__iface_name => "qfx4-xe-0/0/1-to-mx80-3-xe-0/0/4",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # qfx4 xe-0/0/2 to mx80-3 xe-0/0/5
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13022,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13022,
+      :libvirt__iface_name => "qfx4-xe-0/0/2-to-mx80-3-xe-0/0/5",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # qfx4 xe-0/0/3 to mx80-4 xe-0/0/4
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13023,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13023,
+      :libvirt__iface_name => "qfx4-xe-0/0/3-to-mx80-4-xe-0/0/4",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # qfx4 xe-0/0/4 to mx80-4 xe-0/0/5
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 13024,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 13024,
+      :libvirt__iface_name => "qfx4-xe-0/0/4-to-mx80-4-xe-0/0/5",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # qfx4 xe-0/0/5 to vmx5 xe-0/0/4
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13029,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13029,
+      :libvirt__iface_name => "qfx4-xe-0/0/5-to-vmx5-xe-0/0/4",
+      auto_config: false
+
+    node.vm.network :private_network,
+      # qfx4 xe-0/0/6 to vmx5 xe-0/0/5
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => 13030,
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => 13030,
+      :libvirt__iface_name => "qfx4-xe-0/0/6-to-vmx5-xe-0/0/5",
+      auto_config: false
+
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+    :libvirt__network_name => 'mgmt'
+
+
+  end
+
+  config.vm.define "qfx4-pfe" do |node|
+    guest_name = "qfx4pfe"
+    node.vm.box = "juniper/vqfx-pfe"
+    node.vm.box_version = "17.3R3-S2.2"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+    node.ssh.insert_key = false
+
+    node.vm.provider :libvirt do |domain|
+      domain.cpus = 1
+      domain.memory = 2048
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 8
+      domain.nic_model_type = "e1000"
+    end
+
+    node.vm.network :private_network,
+      # qfx4 fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => 10013,
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => 10013,
+      :libvirt__iface_name => "internal-qfx4",
+      auto_config: false
+  end
+    config.vm.define "vsrx1" do |node|
+        guest_name = "vsrx1"
+        node.vm.box = "juniper/vsrx"
+        node.vm.box_version = "18.4R1-S2.4"
+        node.vm.guest = :tinycore
+        node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+        node.ssh.insert_key = false
+        node.vm.network :forwarded_port, guest: 22, host: 2284, host_ip: "127.0.0.1"
+
+    # Limit CPU once Box has finished booting.
+    node.trigger.after :up do |trigger|
+        trigger.name = "Finished Message"
+        trigger.info = "Machine is up! : #{domain_prefix}_#{guest_name}"
+        trigger.run = {inline: "virsh schedinfo #{domain_prefix}_#{guest_name} --set vcpu_quota=35000"}
+    end
+    node.vm.provider :libvirt do |domain|
+        domain.default_prefix = "#{domain_prefix}"
+        domain.cpus = 2
+        domain.memory = 4096
+        domain.disk_bus = "ide"
+    end
+    node.vm.network :private_network,
+        # vsrx1 xe-0/0/0 to vmx4 xe-0/0/1
+        :mac => "#{get_mac()}",
+        :libvirt__tunnel_type => "udp",
+        :libvirt__tunnel_local_ip => "127.255.255.2",
+        :libvirt__tunnel_local_port => 13011,
+        :libvirt__tunnel_ip => "127.255.255.1",
+        :libvirt__tunnel_port => 13011,
+        :libvirt__iface_name => "vsrx1-xe-0/0/0-to-vmx4-xe-0/0/1",
+        auto_config: false
+
+    node.vm.network :private_network,
+        # vsrx1 xe-0/0/1 to vmx5 xe-0/0/6
+        :mac => "#{get_mac()}",
+        :libvirt__tunnel_type => "udp",
+        :libvirt__tunnel_local_ip => "127.255.255.1",
+        :libvirt__tunnel_local_port => 13031,
+        :libvirt__tunnel_ip => "127.255.255.2",
+        :libvirt__tunnel_port => 13031,
+        :libvirt__iface_name => "vsrx1-xe-0/0/1-to-vmx5-xe-0/0/6",
+        auto_config: false
+
+    end
+  end

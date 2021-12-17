@@ -1,0 +1,320 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+def get_mac(oui="28:b7:ad")
+  "Generate a MAC address"
+  nic = (1..3).map{"%0.2x"%rand(256)}.join(":")
+  return "#{oui}:#{nic}"
+end
+
+cwd = Dir.pwd.split("/").last
+username = ENV['USER']
+domain_prefix = "#{username}_#{cwd}"
+
+Vagrant.configure("2") do |config|
+
+{%- for router in config_data['routers'] %}
+  config.vm.define "{{ router }}-vcp" do |node|
+    guest_name = "{{ router }}-vcp"
+    node.vm.box = "juniper/vmx-vcp"
+    node.vm.box_version = "17.3R2.10"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+    node.vm.network :forwarded_port, guest: 22, host: {{ config_data['routers'][router]['ssh_port'] }}, host_ip: "127.0.0.1"
+    node.ssh.insert_key = false
+
+    node.vm.provider :libvirt do |domain|
+      domain.default_prefix = "#{domain_prefix}"
+      domain.cpus = 1
+      domain.memory = 1024
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 11
+      domain.storage :file, :path => "#{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2", :size => "196870144", :type => "qcow2", :bus => "ide", :device => "hdb", :allow_existing => true
+      domain.storage :file, :path => "#{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img", :size => "16777216", :type => "raw", :bus => "ide", :device => "hdc", :allow_existing => true
+    end
+    add_volumes = [
+      "virsh vol-create-as default #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 196870144",
+      "sleep 1",
+      "virsh vol-upload --pool default #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 /opt/vagrant/storage/vmx-vcp-hdb-17.3R2.10-base.qcow2",
+      "sleep 1",
+      "virsh vol-create-as default #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img 16777216",
+      "sleep 1",
+      "virsh vol-upload --pool default #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img /opt/vagrant/storage/vmx-vcp-hdc-17.3R2.10-base.img",
+      "sleep 1"
+    ]
+    add_volumes.each do |i|
+      node.trigger.before :up do |trigger|
+        trigger.name = "add-volumes"
+        trigger.info = "Adding Volumes"
+        trigger.run = {inline: i}
+      end
+    end
+
+    delete_volumes = [
+      "virsh vol-delete #{username}-#{guest_name}-vmx-vcp-hdb-17.3R2.10-base.qcow2 default",
+      "virsh vol-delete #{username}-#{guest_name}-vmx-vcp-hdc-17.3R2.10-base.img default"
+    ]
+    delete_volumes.each do |i|
+      node.trigger.after :destroy do |trigger|
+        trigger.name = "remove-volumes"
+        trigger.info = "Removing Volumes"
+        trigger.run = {inline: i}
+      end
+    end
+
+    node.vm.network :private_network,
+      # {{ router }} fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => {{ config_data['routers'][router]['fpc_port'] }},
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => {{ config_data['routers'][router]['fpc_port'] }},
+      :libvirt__iface_name => "internal-{{ router }}",
+      auto_config: false
+
+  end
+  config.vm.define "{{ router }}-vfp" do |node|
+    guest_name = "{{ router }}-vfp"
+    node.vm.box = "juniper/vmx-vfp"
+    node.vm.box_version = "17.3R2.10"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+
+    node.ssh.insert_key = false
+    node.ssh.username = "root"
+
+    node.vm.provider :libvirt do |domain|
+      domain.default_prefix = "#{domain_prefix}"
+      domain.cpus = 3
+      domain.memory = 4096
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 11
+    end
+
+    node.vm.network :private_network,
+      # {{ router }} fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => {{ config_data['routers'][router]['fpc_port'] }},
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => {{ config_data['routers'][router]['fpc_port'] }},
+      :libvirt__iface_name => "internal-{{ router }}",
+      auto_config: false
+
+{%- for interface in config_data['routers'][router]['interfaces'] %}
+{%- if config_data['routers'][router]['interfaces'][interface]['dst_vm'] is none %}
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+    :libvirt__network_name => 'reserved-bridge'
+
+{% elif config_data['routers'][router]['interfaces'][interface]['dst_vm'] == 'mgmt' %}
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+    :libvirt__network_name => 'mgmt'
+
+{% else %}
+    node.vm.network :private_network,
+      # {{ router }} {{ interface }} to {{ config_data['routers'][router]['interfaces'][interface]['dst_vm'] }} {{ config_data['routers'][router]['interfaces'][interface]['dst_if'] }}
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "{{ config_data['routers'][router]['interfaces'][interface]['src_ip'] }}",
+      :libvirt__tunnel_local_port => {{ config_data['routers'][router]['interfaces'][interface]['port'] }},
+      :libvirt__tunnel_ip => "{{ config_data['routers'][router]['interfaces'][interface]['dst_ip'] }}",
+      :libvirt__tunnel_port => {{ config_data['routers'][router]['interfaces'][interface]['port'] }},
+      :libvirt__iface_name => "{{ router }}-{{ interface }}-to-{{ config_data['routers'][router]['interfaces'][interface]['dst_vm'] }}-{{ config_data['routers'][router]['interfaces'][interface]['dst_if'] }}",
+      auto_config: false
+{% endif %}
+{%- endfor %}
+    end
+{%- endfor %}
+
+{%- for switch in config_data['switches'] %}
+  config.vm.define "{{ switch }}-re" do |node|
+    guest_name = "{{ switch }}-re"
+    node.vm.box = "juniper/vqfx-re"
+    node.vm.box_version = "17.3R3-S2.2"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+    node.vm.network :forwarded_port, guest: 22, host: {{ config_data['switches'][switch]['ssh_port'] }}, host_ip: "127.0.0.1"
+    node.ssh.insert_key = false
+
+    node.vm.provider :libvirt do |domain|
+      domain.cpus = 1
+      domain.memory = 1024
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 10
+      domain.nic_model_type = "e1000"
+    end
+
+    node.vm.network :private_network,
+      # {{ switch }} fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.1",
+      :libvirt__tunnel_local_port => {{ config_data['switches'][switch]['fpc_port'] }},
+      :libvirt__tunnel_ip => "127.255.255.2",
+      :libvirt__tunnel_port => {{ config_data['switches'][switch]['fpc_port'] }},
+      :libvirt__iface_name => "internal-{{ switch }}",
+      auto_config: false
+
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+	:libvirt__network_name => 'reserved-bridge'
+
+
+{%- for interface in config_data['switches'][switch]['interfaces'] %}
+{%- if config_data['switches'][switch]['interfaces'][interface]['dst_vm'] is none %}
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+	:libvirt__network_name => 'reserved-bridge'
+
+{% elif config_data['switches'][switch]['interfaces'][interface]['dst_vm'] == 'mgmt' %}
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+    :libvirt__network_name => 'mgmt'
+
+{% else %}
+    node.vm.network :private_network,
+      # {{ switch }} {{ interface }} to {{ config_data['switches'][switch]['interfaces'][interface]['dst_vm'] }} {{ config_data['switches'][switch]['interfaces'][interface]['dst_if'] }}
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "{{ config_data['switches'][switch]['interfaces'][interface]['src_ip'] }}",
+      :libvirt__tunnel_local_port => {{ config_data['switches'][switch]['interfaces'][interface]['port'] }},
+      :libvirt__tunnel_ip => "{{ config_data['switches'][switch]['interfaces'][interface]['dst_ip'] }}",
+      :libvirt__tunnel_port => {{ config_data['switches'][switch]['interfaces'][interface]['port'] }},
+      :libvirt__iface_name => "{{ switch }}-{{ interface }}-to-{{ config_data['switches'][switch]['interfaces'][interface]['dst_vm'] }}-{{ config_data['switches'][switch]['interfaces'][interface]['dst_if'] }}",
+      auto_config: false
+{% endif %}
+{%- endfor %}
+  end
+
+  config.vm.define "{{ switch }}-pfe" do |node|
+    guest_name = "{{ switch }}pfe"
+    node.vm.box = "juniper/vqfx-pfe"
+    node.vm.box_version = "17.3R3-S2.2"
+    node.vm.guest = :tinycore
+    node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+    node.ssh.insert_key = false
+
+    node.vm.provider :libvirt do |domain|
+      domain.cpus = 1
+      domain.memory = 2048
+      domain.disk_bus = "ide"
+      domain.nic_adapter_count = 8
+      domain.nic_model_type = "e1000"
+    end
+
+    node.vm.network :private_network,
+      # {{ switch }} fpc link
+      :mac => "#{get_mac()}",
+      :libvirt__tunnel_type => "udp",
+      :libvirt__tunnel_local_ip => "127.255.255.2",
+      :libvirt__tunnel_local_port => {{ config_data['switches'][switch]['fpc_port'] }},
+      :libvirt__tunnel_ip => "127.255.255.1",
+      :libvirt__tunnel_port => {{ config_data['switches'][switch]['fpc_port'] }},
+      :libvirt__iface_name => "internal-{{ switch }}",
+      auto_config: false
+  end
+{%- endfor %}
+
+{%- for firewall in config_data['firewalls'] %}
+    config.vm.define "{{ firewall }}" do |node|
+        guest_name = "{{ firewall }}"
+        node.vm.box = "juniper/vsrx"
+        node.vm.box_version = "18.4R1-S2.4"
+        node.vm.guest = :tinycore
+        node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+        node.ssh.insert_key = false
+        node.vm.network :forwarded_port, guest: 22, host: {{ config_data['firewalls'][firewall]['ssh_port'] }}, host_ip: "127.0.0.1"
+
+    # Limit CPU once Box has finished booting.
+    node.trigger.after :up do |trigger|
+        trigger.name = "Finished Message"
+        trigger.info = "Machine is up! : #{domain_prefix}_#{guest_name}"
+        trigger.run = {inline: "virsh schedinfo #{domain_prefix}_#{guest_name} --set vcpu_quota=35000"}
+    end
+    node.vm.provider :libvirt do |domain|
+        domain.default_prefix = "#{domain_prefix}"
+        domain.cpus = 2
+        domain.memory = 4096
+        domain.disk_bus = "ide"
+    end
+{%- for interface in config_data['firewalls'][firewall]['interfaces'] %}
+{%- if config_data['firewalls'][firewall]['interfaces'][interface]['dst_vm'] is none %}
+    node.vm.network :private_network,
+        :auto_config => false,
+        :libvirt__forward_mode => 'veryisolated',
+        :libvirt__dhcp_enabled => false,
+        :libvirt__network_name => 'reserved-bridge'
+
+{% elif config_data['firewalls'][firewall]['interfaces'][interface]['dst_vm'] == 'mgmt' %}
+    node.vm.network :private_network,
+      :auto_config => false,
+      :libvirt__forward_mode => 'veryisolated',
+      :libvirt__dhcp_enabled => false,
+    :libvirt__network_name => 'mgmt'
+
+{% else %}
+    node.vm.network :private_network,
+        # {{ firewall }} {{ interface }} to {{ config_data['firewalls'][firewall]['interfaces'][interface]['dst_vm'] }} {{ config_data['firewalls'][firewall]['interfaces'][interface]['dst_if'] }}
+        :mac => "#{get_mac()}",
+        :libvirt__tunnel_type => "udp",
+        :libvirt__tunnel_local_ip => "{{ config_data['firewalls'][firewall]['interfaces'][interface]['src_ip'] }}",
+        :libvirt__tunnel_local_port => {{ config_data['firewalls'][firewall]['interfaces'][interface]['port'] }},
+        :libvirt__tunnel_ip => "{{ config_data['firewalls'][firewall]['interfaces'][interface]['dst_ip'] }}",
+        :libvirt__tunnel_port => {{ config_data['firewalls'][firewall]['interfaces'][interface]['port'] }},
+        :libvirt__iface_name => "{{ firewall }}-{{ interface }}-to-{{ config_data['firewalls'][firewall]['interfaces'][interface]['dst_vm'] }}-{{ config_data['firewalls'][firewall]['interfaces'][interface]['dst_if'] }}",
+        auto_config: false
+{% endif %}
+{%- endfor %}
+    end
+{%- endfor %}
+{%- for host in config_data['hosts'] %}
+    config.vm.define "{{ host }}" do |node|
+        guest_name = "{{ host }}"
+        node.vm.box = "centos/7"
+        node.vm.guest = :tinycore
+        node.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+        node.ssh.insert_key = false
+        node.vm.network :forwarded_port, guest: 22, host: {{ config_data['hosts'][host]['ssh_port'] }}, host_ip: "127.0.0.1"
+    node.vm.provider :libvirt do |domain|
+        domain.default_prefix = "#{domain_prefix}"
+        domain.cpus = 1
+        domain.memory = 1024
+        domain.disk_bus = "ide"
+    end
+{%- for interface in config_data['hosts'][host]['interfaces'] %}
+{%- if config_data['hosts'][host]['interfaces'][interface]['dst_vm'] is none %}
+    node.vm.network :private_network,
+        :auto_config => false,
+        :libvirt__forward_mode => 'veryisolated',
+        :libvirt__dhcp_enabled => false,
+        :libvirt__network_name => 'reserved-bridge'
+{% else %}
+    node.vm.network :private_network,
+        # {{ host }} {{ interface }} to {{ config_data['hosts'][host]['interfaces'][interface]['dst_vm'] }} {{ config_data['hosts'][host]['interfaces'][interface]['dst_if'] }}
+        :mac => "#{get_mac()}",
+        :libvirt__tunnel_type => "udp",
+        :libvirt__tunnel_local_ip => "{{ config_data['hosts'][host]['interfaces'][interface]['src_ip'] }}",
+        :libvirt__tunnel_local_port => {{ config_data['hosts'][host]['interfaces'][interface]['port'] }},
+        :libvirt__tunnel_ip => "{{ config_data['hosts'][host]['interfaces'][interface]['dst_ip'] }}",
+        :libvirt__tunnel_port => {{ config_data['hosts'][host]['interfaces'][interface]['port'] }},
+        :libvirt__iface_name => "{{ host }}-{{ interface }}-to-{{ config_data['hosts'][host]['interfaces'][interface]['dst_vm'] }}-{{ config_data['hosts'][host]['interfaces'][interface]['dst_if'] }}",
+        auto_config: false
+{% endif %}
+{%- endfor %}
+    end
+{%- endfor %}
+  end

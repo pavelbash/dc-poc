@@ -1,0 +1,688 @@
+routers:
+  core1-dc1:
+    ssh_port: 2242
+    fpc_port: 13001
+    interfaces:
+      xe-0/0/0:
+          port: 12001
+          dst_vm: core2-dc1
+          dst_if: xe-0/0/0
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/1:
+          port: 12002
+          dst_vm: spine1-dc1
+          dst_if: xe-0/0/0
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/2:
+          port: 12003
+          dst_vm: spine1-dc1
+          dst_if: xe-0/0/4
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/3:
+          port: 12004
+          dst_vm: spine2-dc1
+          dst_if: xe-0/0/5
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/4:
+          port: 12005
+          dst_vm: fw1-dc1
+          dst_if: xe-0/0/2
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/5:
+          port: 12006
+          dst_vm: fw2-dc1
+          dst_if: xe-0/0/5
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+  core2-dc1:
+    ssh_port: 2243
+    fpc_port: 13002
+    interfaces:
+      xe-0/0/0:
+          port: 12002
+          dst_vm: core1-dc1
+          dst_if: xe-0/0/1
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/1:
+          port: 12007
+          dst_vm: core2-dc2
+          dst_if: xe-0/0/1
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/2:
+          port: 12008
+          dst_vm: spine2-dc1
+          dst_if: xe-0/0/4
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/3:
+          port: 12009
+          dst_vm: spine1-dc1
+          dst_if: xe-0/0/5
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/4:
+          port: 12010
+          dst_vm: fw2-dc1
+          dst_if: xe-0/0/2
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/5:
+          port: 12011
+          dst_vm: fw1-dc1
+          dst_if: xe-0/0/5
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+  core1-dc2:
+    ssh_port: 2244
+    fpc_port: 13003
+    interfaces:
+      xe-0/0/0:
+          port: 12001
+          dst_vm: core1-dc1
+          dst_if: xe-0/0/0
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/1:
+          port: 12012
+          dst_vm: core2-dc2
+          dst_if: xe-0/0/0
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/2:
+          port: 12013
+          dst_vm: spine1-dc2
+          dst_if: xe-0/0/2
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/3:
+          port: 12014
+          dst_vm: spine2-dc2
+          dst_if: xe-0/0/3
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/4:
+          port: 12015
+          dst_vm: fw1-dc2
+          dst_if: xe-0/0/2
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/5:
+          port: 12016
+          dst_vm: fw2-dc2
+          dst_if: xe-0/0/5
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+  core2-dc2:
+    ssh_port: 2245
+    fpc_port: 13004
+    interfaces:
+      xe-0/0/0:
+          port: 12012
+          dst_vm: core1-dc2
+          dst_if: xe-0/0/1
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/1:
+          port: 12007
+          dst_vm: core2-dc1
+          dst_if: xe-0/0/1
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/2:
+          port: 12017
+          dst_vm: spine2-dc2
+          dst_if: xe-0/0/2
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/3:
+          port: 12018
+          dst_vm: spine1-dc2
+          dst_if: xe-0/0/3
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/4:
+          port: 12019
+          dst_vm: fw2-dc2
+          dst_if: xe-0/0/2
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/5:
+          port: 12020
+          dst_vm: fw1-dc2
+          dst_if: xe-0/0/5
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+switches:
+  spine1-dc1:
+    ssh_port: 2246
+    fpc_port: 13005
+    interfaces:
+      xe-0/0/0:
+          port: 12021
+          dst_vm: leaf1-dc1
+          dst_if: xe-0/0/0
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/1:
+          port: 12022
+          dst_vm: leaf2-dc1
+          dst_if: xe-0/0/0
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/2:
+          port: 12023
+          dst_vm: leaf3-dc1
+          dst_if: xe-0/0/0
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/3:
+          port: 12024
+          dst_vm: leaf4-dc1
+          dst_if: xe-0/0/0
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/4:
+          port: 12003
+          dst_vm: core1-dc1
+          dst_if: xe-0/0/2
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/5:
+          port: 12009
+          dst_vm: core2-dc1
+          dst_if: xe-0/0/3
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/6:
+          port: 12025
+          dst_vm: fw1-dc1
+          dst_if: xe-0/0/3
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/7:
+          port: 12026
+          dst_vm: fw2-dc1
+          dst_if: xe-0/0/4
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+  spine2-dc1:
+    ssh_port: 2247
+    fpc_port: 13006
+    interfaces:
+      xe-0/0/0:
+          port: 12027
+          dst_vm: leaf1-dc1
+          dst_if: xe-0/0/1
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/1:
+          port: 12028
+          dst_vm: leaf2-dc1
+          dst_if: xe-0/0/1
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/2:
+          port: 12029
+          dst_vm: leaf3-dc1
+          dst_if: xe-0/0/1
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/3:
+          port: 12030
+          dst_vm: leaf4-dc1
+          dst_if: xe-0/0/1
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/4:
+          port: 12008
+          dst_vm: core2-dc1
+          dst_if: xe-0/0/2
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/5:
+          port: 12004
+          dst_vm: core1-dc1
+          dst_if: xe-0/0/3
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/6:
+          port: 12031
+          dst_vm: fw2-dc1
+          dst_if: xe-0/0/3
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/7:
+          port: 12032
+          dst_vm: fw1-dc1
+          dst_if: xe-0/0/4
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+  spine1-dc2:
+    ssh_port: 2248
+    fpc_port: 13007
+    interfaces:
+      xe-0/0/0:
+          port: 12033
+          dst_vm: leaf1-dc2
+          dst_if: xe-0/0/0
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/1:
+          port: 12034
+          dst_vm: leaf2-dc2
+          dst_if: xe-0/0/0
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/2:
+          port: 12013
+          dst_vm: core1-dc2
+          dst_if: xe-0/0/2
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/3:
+          port: 12018
+          dst_vm: core2-dc2
+          dst_if: xe-0/0/3
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/4:
+          port: 12035
+          dst_vm: fw1-dc2
+          dst_if: xe-0/0/3
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/5:
+          port: 12036
+          dst_vm: fw2-dc2
+          dst_if: xe-0/0/4
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+  spine2-dc2:
+    ssh_port: 2249
+    fpc_port: 13008
+    interfaces:
+      xe-0/0/0:
+          port: 12037
+          dst_vm: leaf1-dc2
+          dst_if: xe-0/0/1
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/1:
+          port: 12038
+          dst_vm: leaf2-dc2
+          dst_if: xe-0/0/1
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/2:
+          port: 12017
+          dst_vm: core2-dc2
+          dst_if: xe-0/0/2
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/3:
+          port: 12014
+          dst_vm: core1-dc2
+          dst_if: xe-0/0/3
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/4:
+          port: 12039
+          dst_vm: fw2-dc2
+          dst_if: xe-0/0/3
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/5:
+          port: 12040
+          dst_vm: fw1-dc2
+          dst_if: xe-0/0/4
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+  leaf1-dc1:
+    ssh_port: 2250
+    fpc_port: 13009
+    interfaces:
+      xe-0/0/0:
+          port: 12021
+          dst_vm: spine1-dc1
+          dst_if: xe-0/0/0
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/1:
+          port: 12027
+          dst_vm: spine2-dc1
+          dst_if: xe-0/0/0
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/2:
+          port: 12041
+          dst_vm: Host1-dc1
+          dst_if: port1
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+  leaf2-dc1:
+    ssh_port: 2251
+    fpc_port: 13010
+    interfaces:
+      xe-0/0/0:
+          port: 12022
+          dst_vm: spine1-dc1
+          dst_if: xe-0/0/1
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/1:
+          port: 12028
+          dst_vm: spine2-dc1
+          dst_if: xe-0/0/1
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/2:
+          port: 12042
+          dst_vm: Host1-dc1
+          dst_if: port2
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+  leaf3-dc1:
+    ssh_port: 2252
+    fpc_port: 13011
+    interfaces:
+      xe-0/0/0:
+          port: 12023
+          dst_vm: spine1-dc1
+          dst_if: xe-0/0/2
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/1:
+          port: 12029
+          dst_vm: spine2-dc1
+          dst_if: xe-0/0/2
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/2:
+          port: 12043
+          dst_vm: Host2-dc1
+          dst_if: port1
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+  leaf4-dc1:
+    ssh_port: 2253
+    fpc_port: 13012
+    interfaces:
+      xe-0/0/0:
+          port: 12024
+          dst_vm: spine1-dc1
+          dst_if: xe-0/0/3
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/1:
+          port: 12030
+          dst_vm: spine2-dc1
+          dst_if: xe-0/0/3
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/2:
+          port: 12044
+          dst_vm: Host2-dc1
+          dst_if: port2
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+  leaf1-dc2:
+    ssh_port: 2254
+    fpc_port: 13013
+    interfaces:
+      xe-0/0/0:
+          port: 12033
+          dst_vm: spine1-dc2
+          dst_if: xe-0/0/0
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/1:
+          port: 12037
+          dst_vm: spine1-dc2
+          dst_if: xe-0/0/0
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/2:
+          port: 12045
+          dst_vm: spine2-dc2
+          dst_if: port1
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+  leaf2-dc2:
+    ssh_port: 2255
+    fpc_port: 13014
+    interfaces:
+      xe-0/0/0:
+          port: 12034
+          dst_vm: Host1-dc2
+          dst_if: xe-0/0/1
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/1:
+          port: 12038
+          dst_vm: spine1-dc2
+          dst_if: xe-0/0/1
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/2:
+          port: 12046
+          dst_vm: spine2-dc2
+          dst_if: port2
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+firewalls:
+  fw1-dc1:
+    ssh_port: 2256
+    fpc_port: 13015
+    interfaces:
+      xe-0/0/0:
+          port: 12047
+          dst_vm: Host1-dc2
+          dst_if: xe-0/0/0
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/1:
+          port: 12048
+          dst_vm: fw2-dc1
+          dst_if: xe-0/0/1
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/2:
+          port: 12005
+          dst_vm: fw2-dc1
+          dst_if: xe-0/0/4
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/3:
+          port: 12025
+          dst_vm: core1-dc1
+          dst_if: xe-0/0/6
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/4:
+          port: 12032
+          dst_vm: spine1-dc1
+          dst_if: xe-0/0/7
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/5:
+          port: 12011
+          dst_vm: spine2-dc1
+          dst_if: xe-0/0/5
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+  fw2-dc1:
+    ssh_port: 2257
+    fpc_port: 13016
+    interfaces:
+      xe-0/0/0:
+          port: 12047
+          dst_vm: core2-dc1
+          dst_if: xe-0/0/0
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/1:
+          port: 12048
+          dst_vm: fw1-dc1
+          dst_if: xe-0/0/1
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/2:
+          port: 12010
+          dst_vm: fw1-dc1
+          dst_if: xe-0/0/4
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/3:
+          port: 12031
+          dst_vm: core2-dc1
+          dst_if: xe-0/0/6
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/4:
+          port: 12026
+          dst_vm: spine2-dc1
+          dst_if: xe-0/0/7
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/5:
+          port: 12006
+          dst_vm: spine1-dc1
+          dst_if: xe-0/0/5
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+  fw1-dc2:
+    ssh_port: 2258
+    fpc_port: 13017
+    interfaces:
+      xe-0/0/0:
+          port: 12049
+          dst_vm: core1-dc1
+          dst_if: xe-0/0/0
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/1:
+          port: 12050
+          dst_vm: fw2-dc2
+          dst_if: xe-0/0/1
+          src_ip: 127.255.255.1
+          dst_ip: 127.255.255.2
+      xe-0/0/2:
+          port: 12015
+          dst_vm: fw2-dc2
+          dst_if: xe-0/0/4
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/3:
+          port: 12035
+          dst_vm: core1-dc2
+          dst_if: xe-0/0/4
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/4:
+          port: 12040
+          dst_vm: spine1-dc2
+          dst_if: xe-0/0/5
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/5:
+          port: 12020
+          dst_vm: spine2-dc2
+          dst_if: xe-0/0/5
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+  fw2-dc2:
+    ssh_port: 2259
+    fpc_port: 13018
+    interfaces:
+      xe-0/0/0:
+          port: 12049
+          dst_vm: core2-dc2
+          dst_if: xe-0/0/0
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/1:
+          port: 12050
+          dst_vm: fw1-dc2
+          dst_if: xe-0/0/1
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/2:
+          port: 12019
+          dst_vm: fw1-dc2
+          dst_if: xe-0/0/4
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/3:
+          port: 12039
+          dst_vm: core2-dc2
+          dst_if: xe-0/0/4
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/4:
+          port: 12036
+          dst_vm: spine2-dc2
+          dst_if: xe-0/0/5
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      xe-0/0/5:
+          port: 12016
+          dst_vm: spine1-dc2
+          dst_if: xe-0/0/5
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+hosts:
+  Host1-dc1:
+    ssh_port: 2260
+    fpc_port:
+    interfaces:
+      port1:
+          port: 12041
+          dst_vm: core1-dc2
+          dst_if: xe-0/0/2
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      port2:
+          port: 12042
+          dst_vm: leaf1-dc1
+          dst_if: xe-0/0/2
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+  Host2-dc1:
+    ssh_port: 2261
+    fpc_port:
+    interfaces:
+      port1:
+          port: 12043
+          dst_vm: leaf2-dc1
+          dst_if: xe-0/0/2
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      port2:
+          port: 12044
+          dst_vm: leaf3-dc1
+          dst_if: xe-0/0/2
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+  Host1-dc2:
+    ssh_port: 2262
+    fpc_port:
+    interfaces:
+      port1:
+          port: 12045
+          dst_vm: leaf4-dc1
+          dst_if: xe-0/0/2
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
+      port2:
+          port: 12046
+          dst_vm: leaf1-dc2
+          dst_if: xe-0/0/2
+          src_ip: 127.255.255.2
+          dst_ip: 127.255.255.1
